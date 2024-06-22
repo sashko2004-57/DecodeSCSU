@@ -1,229 +1,268 @@
-LONG_COMBINATIONS_ADDITIONAL_SIZE=2
-MOST_SIGNIFICANT_BYTE_MULT=0x100
-REPLACEMENT_CHAR="\ufffd"
-FIRST_HIGH_SURROGATE_CODE=0xd800
-FIRST_LOW_SURROGATE_CODE=0xdc00
-FIRST_PRIV_CHAR_CODE=0xe000
-#Single byte mode
-QUOTE_WIN_0_1BYTE=0x01
-TAB_CODE=0x09
-DEFINE_EXTENDED_1BYTE=0x0b
-RESERVED_1BYTE=0x0c
-QUOTE_UNICODE_1BYTE=0x0e
-BYTE_CHOOSE_UNICODE_MODE=0x0f
-CHOOSE_DYN_WIN_0_1BYTE=0x10
-DEFINE_DYN_WIN_0_1BYTE=0x18
-SPACE_CODE=0x20
-WIN_SIZE=0x80
-STATIC_WINS=(0x0000, 0x0080, 0x0100, 0x0300, 0x2000, 0x2080, 0x2100, 0x3000)
-DYN_WINS_INIT=(0x0080, 0x00c0, 0x0400, 0x0600, 0x0900, 0x3040, 0x30a0, 0xff00)
-DEF_DYN_WIN_1ST_PRIV_CODE=0x68
-DEF_DYN_WIN_LAST_BMP_CODE=0xa7
-DEF_DYN_WIN_1ST_PRIV_ADD_OFFSET=0xac00
-DEF_DYN_WIN_1ST_CROSS_BORDER_CODE=0xf9
-DEF_DYN_WIN_CROSS_BORDER_OFFSETS=(0x00c0,0x0250,0x0370,0x0530,0x3040,0x30a0,0xff60)
-DEF_EXT_WIN_PARAMS_SPLIT=0x2000
-FIRST_NON_BMP_CHAR_CODE=0x10000
-#Unicode mode
-CHOOSE_DYN_WIN_0_UNI=0xe0
-DEFINE_DYN_WIN_0_UNI=0xe8
-QUOTE_UNICODE_UNI=0xf0
-DEFINE_EXTENDED_UNI=0xf1
-RESERVED_UNI=0xf2
+LONG_COMBINATIONS_ADDITIONAL_SIZE = 2
+MOST_SIGNIFICANT_BYTE_MULT = 0x100
+REPLACEMENT_CHAR = "\ufffd"
+FIRST_HIGH_SURROGATE_CODE = 0xD800
+FIRST_LOW_SURROGATE_CODE = 0xDC00
+FIRST_PRIV_CHAR_CODE = 0xE000
+# Single byte mode
+QUOTE_WIN_0_1BYTE = 0x01
+TAB_CODE = 0x09
+DEFINE_EXTENDED_1BYTE = 0x0B
+RESERVED_1BYTE = 0x0C
+QUOTE_UNICODE_1BYTE = 0x0E
+BYTE_CHOOSE_UNICODE_MODE = 0x0F
+CHOOSE_DYN_WIN_0_1BYTE = 0x10
+DEFINE_DYN_WIN_0_1BYTE = 0x18
+SPACE_CODE = 0x20
+WIN_SIZE = 0x80
+STATIC_WINS = (
+    0x0000,
+    0x0080,
+    0x0100,
+    0x0300,
+    0x2000,
+    0x2080,
+    0x2100,
+    0x3000
+)
+DYN_WINS_INIT = (
+    0x0080,
+    0x00C0,
+    0x0400,
+    0x0600,
+    0x0900,
+    0x3040,
+    0x30A0,
+    0xFF00
+)
+DEF_DYN_WIN_1ST_PRIV_CODE = 0x68
+DEF_DYN_WIN_LAST_BMP_CODE = 0xA7
+DEF_DYN_WIN_1ST_PRIV_ADD_OFFSET = 0xAC00
+DEF_DYN_WIN_1ST_CROSS_BORDER_CODE = 0xF9
+DEF_DYN_WIN_CROSS_BORDER_OFFSETS = (
+    0x00C0,
+    0x0250,
+    0x0370,
+    0x0530,
+    0x3040,
+    0x30A0,
+    0xFF60,
+)
+DEF_EXT_WIN_PARAMS_SPLIT = 0x2000
+FIRST_NON_BMP_CHAR_CODE = 0x10000
+# Unicode mode
+CHOOSE_DYN_WIN_0_UNI = 0xE0
+DEFINE_DYN_WIN_0_UNI = 0xE8
+QUOTE_UNICODE_UNI = 0xF0
+DEFINE_EXTENDED_UNI = 0xF1
+RESERVED_UNI = 0xF2
 
-def isHighSurrogateCode(charCode):
-    return charCode>=FIRST_HIGH_SURROGATE_CODE and charCode<FIRST_LOW_SURROGATE_CODE
 
-def isLowSurrogateCode(charCode):
-    return charCode>=FIRST_LOW_SURROGATE_CODE and charCode<FIRST_PRIV_CHAR_CODE
+def is_high_surrogate_code(char_code):
+    return FIRST_HIGH_SURROGATE_CODE <= char_code < FIRST_LOW_SURROGATE_CODE
 
-class scsuDecoderClass:
+
+def is_low_surrogate_code(char_code):
+    return FIRST_LOW_SURROGATE_CODE <= char_code < FIRST_PRIV_CHAR_CODE
+
+
+class SCSUDecoder:
     def __init__(self):
-        self.wins=[STATIC_WINS, list(DYN_WINS_INIT)]
-        self.quoteWinIndex=None
-        self.decodedBytesAmount=0
-        self.decodedText=""
-        self.currentWin=0
-        self.unicodeMode=False
-        self.waitLowSurrogate=False
-        self.savedHighSurrogateCode=None
-        
-    def chooseWin(self, chosenWinIndex):
-        self.currentWin=self.wins[1][chosenWinIndex]
+        self.wins = [STATIC_WINS, list(DYN_WINS_INIT)]
+        self.decoded_text = ""
+        self.current_win = 0
+        self.unicode_mode = False
+        self.wait_low_surrogate = False
+        self.saved_high_surrogate_code = None
 
-    def decodeByte(self, byteToDecode, quoteWinIndex=-1):
-        isFromDynamicWin=byteToDecode>=WIN_SIZE
-        if quoteWinIndex==-1:
-            winOffs=self.currentWin if isFromDynamicWin else 0
+    def choose_win(self, chosen_win_index):
+        self.current_win = self.wins[1][chosen_win_index]
+
+    def decode_byte(self, byte_to_decode, quote_win_index=-1):
+        is_from_dynamic_win = byte_to_decode >= WIN_SIZE
+        if quote_win_index == -1:
+            win_offs = self.current_win if is_from_dynamic_win else 0
         else:
-            isFromDynamicWin=byteToDecode>=WIN_SIZE
-            winOffs=self.wins[isFromDynamicWin][quoteWinIndex]
-        charCode=winOffs+byteToDecode%WIN_SIZE
-        self.decodedText+=chr(charCode)
-        
-    def catchNotValidByteCombination(self):
-        self.decodedText+=REPLACEMENT_CHAR
+            win_offs = self.wins[is_from_dynamic_win][quote_win_index]
+        char_code = win_offs + byte_to_decode % WIN_SIZE
+        self.decoded_text += chr(char_code)
 
-    def decodeUniModeCode(self, charCode):
-        if self.waitLowSurrogate:
-            if isLowSurrogateCode(charCode):
-                surrogatePair=chr(self.savedHighSurrogateCode)+chr(charCode)
-                self.decodedText+=surrogatePair
-                self.waitLowSurrogate=False
+    def catch_not_valid_byte_combination(self):
+        self.decoded_text += REPLACEMENT_CHAR
+
+    def decode_uni_mode_code(self, char_code):
+        if self.wait_low_surrogate:
+            self.wait_low_surrogate = False
+            if is_low_surrogate_code(char_code):
+                surrogate_pair = chr(self.saved_high_surrogate_code) + chr(char_code)
+                self.decoded_text += surrogate_pair
                 return
-            self.catchNotValidByteCombination()
-            self.waitLowSurrogate=False
-        if isHighSurrogateCode(charCode):
-            self.waitLowSurrogate=True
-            self.savedHighSurrogateCode=charCode
+            self.catch_not_valid_byte_combination()
+        if is_high_surrogate_code(char_code):
+            self.wait_low_surrogate = True
+            self.saved_high_surrogate_code = char_code
             return
-        if isLowSurrogateCode(charCode):
-            self.catchNotValidByteCombination()
+        if is_low_surrogate_code(char_code):
+            self.catch_not_valid_byte_combination()
             return
-        self.decodedText+=chr(charCode)
-    
-    def defDynamicWin(self, offset, index):
-        if offset is None:
-            self.catchNotValidByteCombination()
-        else:
-            self.wins[1][index]=offset
-            self.currentWin=offset
+        self.decoded_text += chr(char_code)
 
-def convertCodeToOffset(winCode):
-    if winCode!=0 and winCode<DEF_DYN_WIN_1ST_PRIV_CODE:
-        return winCode*WIN_SIZE
-    if winCode<=DEF_DYN_WIN_LAST_BMP_CODE:
-        return winCode*WIN_SIZE+DEF_DYN_WIN_1ST_PRIV_ADD_OFFSET
-    if winCode>=DEF_DYN_WIN_1ST_CROSS_BORDER_CODE:
-        crossBorderOffsIndex=winCode-DEF_DYN_WIN_1ST_CROSS_BORDER_CODE
-        return DEF_DYN_WIN_CROSS_BORDER_OFFSETS[crossBorderOffsIndex]
+    def def_dynamic_win(self, offset, index):
+        if offset:
+            self.wins[1][index] = offset
+            self.current_win = offset
+        else:
+            self.catch_not_valid_byte_combination()
+
+
+def convert_code_to_offset(win_code):
+    if win_code < DEF_DYN_WIN_1ST_PRIV_CODE:
+        return win_code * WIN_SIZE
+    if win_code <= DEF_DYN_WIN_LAST_BMP_CODE:
+        return win_code * WIN_SIZE + DEF_DYN_WIN_1ST_PRIV_ADD_OFFSET
+    if win_code >= DEF_DYN_WIN_1ST_CROSS_BORDER_CODE:
+        cross_border_offs_index = win_code - DEF_DYN_WIN_1ST_CROSS_BORDER_CODE
+        return DEF_DYN_WIN_CROSS_BORDER_OFFSETS[cross_border_offs_index]
     return
 
-def defineDynamicWin(byteCode, winIndex, decoder):
-    offs=convertCodeToOffset(byteCode)
-    decoder.defDynamicWin(offs, winIndex)
 
-def defineDynamicWinExt(combinedBytes, decoder):
-    winIndex=combinedBytes//DEF_EXT_WIN_PARAMS_SPLIT
-    winOffsId=combinedBytes%DEF_EXT_WIN_PARAMS_SPLIT
-    winOffset=FIRST_NON_BMP_CHAR_CODE+winOffsId*WIN_SIZE
-    decoder.defDynamicWin(winOffset, winIndex)
+def define_dynamic_win(byte_code, win_index, decoder):
+    offs = convert_code_to_offset(byte_code)
+    decoder.def_dynamic_win(offs, win_index)
 
-def checkSizeOfByteCombination(leadByte):
-    if leadByte==DEFINE_EXTENDED_1BYTE or leadByte==QUOTE_UNICODE_1BYTE:
+
+def define_dynamic_win_ext(combined_bytes, decoder):
+    win_index = combined_bytes // DEF_EXT_WIN_PARAMS_SPLIT
+    win_offs_id = combined_bytes % DEF_EXT_WIN_PARAMS_SPLIT
+    win_offset = FIRST_NON_BMP_CHAR_CODE + win_offs_id * WIN_SIZE
+    decoder.def_dynamic_win(win_offset, win_index)
+
+
+def check_size_of_byte_combination(lead_byte):
+    if lead_byte == DEFINE_EXTENDED_1BYTE or lead_byte == QUOTE_UNICODE_1BYTE:
         return LONG_COMBINATIONS_ADDITIONAL_SIZE
-    isQuoteSingleByte=leadByte>=QUOTE_WIN_0_1BYTE and leadByte<TAB_CODE
-    isDefineWin=leadByte>=DEFINE_DYN_WIN_0_1BYTE and leadByte<SPACE_CODE
-    if isQuoteSingleByte or isDefineWin:
+    is_quote_single_byte = QUOTE_WIN_0_1BYTE <= lead_byte < TAB_CODE
+    is_define_win = DEFINE_DYN_WIN_0_1BYTE <= lead_byte < SPACE_CODE
+    if is_quote_single_byte or is_define_win:
         return 1
     return 0
 
-def checkSizeOfByteCombinationUni(leadByte):
-    if leadByte==DEFINE_EXTENDED_UNI or leadByte==QUOTE_UNICODE_UNI:
+
+def check_size_of_byte_combination_uni(lead_byte):
+    if lead_byte == DEFINE_EXTENDED_UNI or lead_byte == QUOTE_UNICODE_UNI:
         return LONG_COMBINATIONS_ADDITIONAL_SIZE
-    isChooseWin=leadByte>=CHOOSE_DYN_WIN_0_UNI and leadByte<DEFINE_DYN_WIN_0_UNI
-    if isChooseWin or leadByte==RESERVED_UNI:
+    is_choose_win = CHOOSE_DYN_WIN_0_UNI <= lead_byte < DEFINE_DYN_WIN_0_UNI
+    if is_choose_win or lead_byte == RESERVED_UNI:
         return 0
     return 1
 
-def decodeLongByteCombination(tagByte, argsBytes, decoder):
-    combinedArgs=int.from_bytes(argsBytes)
-    if tagByte==DEFINE_EXTENDED_1BYTE:
-        defineDynamicWinExt(combinedArgs, decoder)
-    else:
-        decoder.decodeUniModeCode(combinedArgs)
 
-def decodeLongByteCombinationUni(tagByte, argsBytes, decoder):
-    combinedArgs=int.from_bytes(argsBytes)
-    if tagByte==DEFINE_EXTENDED_UNI:
-        defineDynamicWinExt(combinedArgs, decoder)
-        decoder.unicodeMode=False
+def decode_long_byte_combination(tag_byte, args_bytes, decoder):
+    combined_args = int.from_bytes(args_bytes)
+    if tag_byte == DEFINE_EXTENDED_1BYTE:
+        define_dynamic_win_ext(combined_args, decoder)
     else:
-        decoder.decodeUniModeCode(combinedArgs)
+        decoder.decode_uni_mode_code(combined_args)
 
-def decodeShortByteCombination(tagByte, argByte, decoder):
-    arg=int.from_bytes(argByte)
-    if tagByte<TAB_CODE:
-        winIndex=tagByte-QUOTE_WIN_0_1BYTE
-        decoder.decodeByte(arg, winIndex)
-    else:
-        winIndex=tagByte-DEFINE_DYN_WIN_0_1BYTE
-        defineDynamicWin(arg, winIndex, decoder)
 
-def decodeShortByteCombinationUni(tagByte, argByte, decoder):
-    arg=int.from_bytes(argByte)
-    if tagByte>=DEFINE_DYN_WIN_0_UNI and tagByte<QUOTE_UNICODE_UNI:
-        winIndex=tagByte-DEFINE_DYN_WIN_0_UNI
-        defineDynamicWin(arg, winIndex, decoder)
-        decoder.unicodeMode=False
+def decode_long_byte_combination_uni(tag_byte, args_bytes, decoder):
+    combined_args = int.from_bytes(args_bytes)
+    if tag_byte == DEFINE_EXTENDED_UNI:
+        define_dynamic_win_ext(combined_args, decoder)
+        decoder.unicode_mode = False
     else:
-        charCode=MOST_SIGNIFICANT_BYTE_MULT*tagByte+arg
-        decoder.decodeUniModeCode(charCode)
+        decoder.decode_uni_mode_code(combined_args)
 
-def decodeSingleByte(byteToDecode, decoder):
-    if byteToDecode==BYTE_CHOOSE_UNICODE_MODE:
-        decoder.unicodeMode=True
-    elif byteToDecode>=CHOOSE_DYN_WIN_0_1BYTE and byteToDecode<DEFINE_DYN_WIN_0_1BYTE:
-        winIndex=byteToDecode-CHOOSE_DYN_WIN_0_1BYTE
-        decoder.chooseWin(winIndex)
-    elif byteToDecode==RESERVED_1BYTE:
-        decoder.catchNotValidByteCombination()
+
+def decode_short_byte_combination(tag_byte, arg_byte, decoder):
+    arg = int.from_bytes(arg_byte)
+    if tag_byte < TAB_CODE:
+        win_index = tag_byte - QUOTE_WIN_0_1BYTE
+        decoder.decode_byte(arg, win_index)
     else:
-        decoder.decodeByte(byteToDecode)
-        
-def checkLeadByteInWaitingLowSurrogate(leadByte, addBytesAmount, decoder):
-    if not addBytesAmount:
-        isChooseWin=leadByte>=CHOOSE_DYN_WIN_0_1BYTE and leadByte<DEFINE_DYN_WIN_0_1BYTE
-        if leadByte==BYTE_CHOOSE_UNICODE_MODE or isChooseWin:
+        win_index = tag_byte - DEFINE_DYN_WIN_0_1BYTE
+        define_dynamic_win(arg, win_index, decoder)
+
+
+def decode_short_byte_combination_uni(tag_byte, arg_byte, decoder):
+    arg = int.from_bytes(arg_byte)
+    if DEFINE_DYN_WIN_0_UNI <= tag_byte < QUOTE_UNICODE_UNI:
+        win_index = tag_byte - DEFINE_DYN_WIN_0_UNI
+        define_dynamic_win(arg, win_index, decoder)
+        decoder.unicode_mode = False
+    else:
+        char_code = MOST_SIGNIFICANT_BYTE_MULT * tag_byte + arg
+        decoder.decode_uni_mode_code(char_code)
+
+
+def decode_single_byte(byte_to_decode, decoder):
+    if byte_to_decode == BYTE_CHOOSE_UNICODE_MODE:
+        decoder.unicode_mode = True
+    elif CHOOSE_DYN_WIN_0_1BYTE <= byte_to_decode < DEFINE_DYN_WIN_0_1BYTE:
+        win_index = byte_to_decode - CHOOSE_DYN_WIN_0_1BYTE
+        decoder.choose_win(win_index)
+    elif byte_to_decode == RESERVED_1BYTE:
+        decoder.catch_not_valid_byte_combination()
+    else:
+        decoder.decode_byte(byte_to_decode)
+
+def check_lead_byte_in_waiting_low_surrogate(lead_byte, add_bytes_amount, decoder):
+    if add_bytes_amount:
+        if lead_byte >= DEFINE_EXTENDED_1BYTE:
             return
-    elif not(leadByte>=QUOTE_WIN_0_1BYTE and leadByte<TAB_CODE):
-        return
-    decoder.catchNotValidByteCombination()
-    decoder.waitLowSurrogate=False
+    else:
+        is_choose_win = CHOOSE_DYN_WIN_0_1BYTE <= lead_byte < DEFINE_DYN_WIN_0_1BYTE
+        if lead_byte == BYTE_CHOOSE_UNICODE_MODE or is_choose_win:
+            return
+    decoder.catch_not_valid_byte_combination()
+    decoder.wait_low_surrogate = False
 
-def decodeInUnicodeMode(bytesToDecode, decoder):
-    bytesLeft=bytesToDecode
-    while len(bytesLeft) and decoder.unicodeMode:
-        mostSignifByte=bytesLeft[0]
-        additionalBytesAmount=checkSizeOfByteCombinationUni(mostSignifByte)
-        additionalBytes=bytesLeft[1:additionalBytesAmount+1]
-        bytesLeft=bytesLeft[additionalBytesAmount+1:]
-        if len(additionalBytes)==additionalBytesAmount:
-            if additionalBytesAmount>1:
-                decodeLongByteCombinationUni(mostSignifByte, additionalBytes, decoder)
-            elif not additionalBytesAmount:
-                if mostSignifByte==RESERVED_UNI:
-                    decoder.catchNotValidByteCombination()
+
+def decode_in_unicode_mode(bytes_to_decode, decoder):
+    bytes_left = bytes_to_decode
+    while len(bytes_left) and decoder.unicode_mode:
+        most_signif_byte = bytes_left[0]
+        additional_bytes_amount = check_size_of_byte_combination_uni(most_signif_byte)
+        additional_bytes = bytes_left[1 : additional_bytes_amount + 1]
+        bytes_left = bytes_left[additional_bytes_amount + 1 :]
+        if len(additional_bytes) == additional_bytes_amount:
+            if additional_bytes_amount > 1:
+                decode_long_byte_combination_uni(most_signif_byte, additional_bytes, decoder)
+            elif additional_bytes_amount:
+                decode_short_byte_combination_uni(most_signif_byte, additional_bytes, decoder)
+            else:
+                if most_signif_byte == RESERVED_UNI:
+                    decoder.catch_not_valid_byte_combination()
                     break
-                winIndex=mostSignifByte-CHOOSE_DYN_WIN_0_UNI
-                decoder.chooseWin(winIndex)
-                decoder.unicodeMode=False
-            else:
-                decodeShortByteCombinationUni(mostSignifByte, additionalBytes, decoder)
+                win_index = most_signif_byte - CHOOSE_DYN_WIN_0_UNI
+                decoder.choose_win(win_index)
+                decoder.unicode_mode = False
         else:
-            decoder.catchNotValidByteCombination()
-    return bytesLeft
-                
+            decoder.catch_not_valid_byte_combination()
+    return bytes_left
 
-def decodeScsu(bytesToDecode):
-    scsuDecoder=scsuDecoderClass()
-    bytesLeft=bytesToDecode
-    while len(bytesLeft):
-        currentByte=bytesLeft[0]
-        additionalBytesAmount=checkSizeOfByteCombination(currentByte)
-        if scsuDecoder.waitLowSurrogate:
-            checkTagInWaitingLowSurrogate(currentByte, additionalBytesAmount, scsuDecoder)
-        additionalBytes=bytesLeft[1:additionalBytesAmount+1]
-        bytesLeft=bytesLeft[additionalBytesAmount+1:]
-        if len(additionalBytes)==additionalBytesAmount:
-            if additionalBytesAmount>1:
-                decodeLongByteCombination(currentByte, additionalBytes, scsuDecoder)
-            elif additionalBytesAmount:
-                decodeShortByteCombination(currentByte, additionalBytes, scsuDecoder)
+
+def decode_scsu(bytes_to_decode):
+    scsu_decoder = SCSUDecoder()
+    bytes_left = bytes_to_decode
+    while len(bytes_left):
+        current_byte = bytes_left[0]
+        additional_bytes_amount = check_size_of_byte_combination(current_byte)
+        if scsu_decoder.wait_low_surrogate:
+            check_lead_byte_in_waiting_low_surrogate(
+                current_byte, additional_bytes_amount, scsu_decoder
+            )
+        additional_bytes = bytes_left[1 : additional_bytes_amount + 1]
+        bytes_left = bytes_left[additional_bytes_amount + 1 :]
+        if len(additional_bytes) == additional_bytes_amount:
+            if additional_bytes_amount > 1:
+                decode_long_byte_combination(current_byte, additional_bytes, scsu_decoder)
+            elif additional_bytes_amount:
+                decode_short_byte_combination(current_byte, additional_bytes, scsu_decoder)
             else:
-                decodeSingleByte(currentByte, scsuDecoder)
+                decode_single_byte(current_byte, scsu_decoder)
         else:
-            scsuDecoder.catchNotValidByteCombination()
-        if scsuDecoder.unicodeMode:
-            bytesLeft=decodeInUnicodeMode(bytesLeft, scsuDecoder)
-    return scsuDecoder.decodedText
+            scsu_decoder.catch_not_valid_byte_combination()
+        if scsu_decoder.unicode_mode:
+            bytes_left = decode_in_unicode_mode(bytes_left, scsu_decoder)
+    return scsu_decoder.decoded_text
