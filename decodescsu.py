@@ -139,7 +139,9 @@ def define_dynamic_win_ext(combined_bytes, decoder):
 
 
 def check_size_of_byte_combination(lead_byte):
-    if lead_byte == DEFINE_EXTENDED_1BYTE or lead_byte == QUOTE_UNICODE_1BYTE:
+    is_define_extended = lead_byte == DEFINE_EXTENDED_1BYTE
+    is_quote_unicode = lead_byte == QUOTE_UNICODE_1BYTE
+    if is_define_extended or is_quote_unicode:
         return LONG_COMBINATIONS_ADDITIONAL_SIZE
     is_quote_single_byte = QUOTE_WIN_0_1BYTE <= lead_byte < TAB_CODE
     is_define_win = DEFINE_DYN_WIN_0_1BYTE <= lead_byte < SPACE_CODE
@@ -149,7 +151,9 @@ def check_size_of_byte_combination(lead_byte):
 
 
 def check_size_of_byte_combination_uni(lead_byte):
-    if lead_byte == DEFINE_EXTENDED_UNI or lead_byte == QUOTE_UNICODE_UNI:
+    is_define_extended = lead_byte == DEFINE_EXTENDED_UNI
+    is_quote_unicode = lead_byte == QUOTE_UNICODE_UNI
+    if is_define_extended or is_quote_unicode:
         return LONG_COMBINATIONS_ADDITIONAL_SIZE
     is_choose_win = CHOOSE_DYN_WIN_0_UNI <= lead_byte < DEFINE_DYN_WIN_0_UNI
     if is_choose_win or lead_byte == RESERVED_UNI:
